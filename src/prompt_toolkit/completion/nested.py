@@ -9,6 +9,7 @@ from typing import Any, Iterable, Mapping, Set, Union
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.completion.word_completer import WordCompleter
 from prompt_toolkit.document import Document
+from prompt_toolkit.formatted_text import AnyFormattedText
 
 __all__ = ["NestedCompleter"]
 
@@ -29,10 +30,11 @@ class NestedCompleter(Completer):
     """
 
     def __init__(
-        self, options: dict[str, Completer | None], ignore_case: bool = True
+        self, options: dict[str, Completer | None], ignore_case: bool = True, meta_dict: Mapping[str, AnyFormattedText] | None = None,
     ) -> None:
         self.options = options
         self.ignore_case = ignore_case
+        self.meta_dict = meta_dict or {}
 
     def __repr__(self) -> str:
         return f"NestedCompleter({self.options!r}, ignore_case={self.ignore_case!r})"
@@ -63,8 +65,11 @@ class NestedCompleter(Completer):
         Values in this data structure can be a completers as well.
         """
         options: dict[str, Completer | None] = {}
+        meta_dict = {}
         for key, value in data.items():
-            if isinstance(value, Completer):
+            if key == "meta_dict":
+                meta_dict = value
+            elif isinstance(value, Completer):
                 options[key] = value
             elif isinstance(value, dict):
                 options[key] = cls.from_nested_dict(value)
@@ -74,7 +79,7 @@ class NestedCompleter(Completer):
                 assert value is None
                 options[key] = None
 
-        return cls(options)
+        return cls(options, meta_dict=meta_dict)
 
     def get_completions(
         self, document: Document, complete_event: CompleteEvent
@@ -104,6 +109,7 @@ class NestedCompleter(Completer):
         # No space in the input: behave exactly like `WordCompleter`.
         else:
             completer = WordCompleter(
-                list(self.options.keys()), ignore_case=self.ignore_case
+                list(self.options.keys()), ignore_case=self.ignore_case, meta_dict=self.meta_dict
             )
             yield from completer.get_completions(document, complete_event)
+
